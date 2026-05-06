@@ -1,0 +1,35 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!terraform.tfvars.example
+terraform.tfplan
+crash.log
+ 
+# Security scan outputs
+*.sarif
+bandit-results.*
+trivy-*.json
+sca-results.json
+sbom.json
+trufflehog-results.json
+ 
+# Docker
+*.tar
+ 
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+ 
+# OS
+.DS_Store
+Thumbs.db
+ 
+# IDE
+.vscode/
+.idea/

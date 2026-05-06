@@ -1,0 +1,18 @@
+###############################################################
+# Copy this file to terraform.tfvars and fill in your values
+# Command: cp terraform.tfvars.example terraform.tfvars
+###############################################################
+ 
+aws_region             = "us-east-1"
+environment            = "dev"
+project_name           = "dotweb-devsecops"
+ecr_repo_name          = "dotweb-app"
+pipeline_bucket_suffix = "pipeline-reports"
+ 
+# ⚠️ REQUIRED — Replace with your actual GitHub username
+github_org  = "YOUR_GITHUB_USERNAME"
+github_repo = "dotweb-devsecops-pipeline"
+ 
+# Keep this true on first run.
+# If you get an error that OIDC provider already exists, change to false and re-run.
+create_oidc_provider = true

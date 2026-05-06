@@ -10,7 +10,6 @@
 
 [![Pipeline Status](https://img.shields.io/badge/Pipeline-Passing-28a745?style=flat-square&logo=github-actions&logoColor=white)](https://github.com/AdeoyeEmmanuel2020/dotweb-devsecops-pipeline/actions)
 [![Terraform](https://img.shields.io/badge/IaC-Terraform_1.3+-7B42BC?style=flat-square&logo=terraform&logoColor=white)](https://www.terraform.io/)
-[![AWS Free Tier](https://img.shields.io/badge/AWS-Free_Tier_Safe-FF9900?style=flat-square&logo=amazon-aws&logoColor=white)](https://aws.amazon.com/free/)
 [![Security Tools](https://img.shields.io/badge/Security_Tools-8+-e63946?style=flat-square&logo=security&logoColor=white)](#security-tools)
 [![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)](LICENSE)
 [![Docker](https://img.shields.io/badge/Container-Docker_Multi--Stage-2496ED?style=flat-square&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -205,7 +204,7 @@ Triggers: Always — even if upstream stages fail
 
 ---
 
-## ☁ AWS Infrastructure
+## AWS Infrastructure
 
 All infrastructure is defined as code in Terraform and provisioned in `us-east-1`.
 
@@ -257,26 +256,6 @@ No AWS access keys are stored in GitHub. The pipeline authenticates via short-li
 
 ---
 
-## AWS Free Tier Compliance
-
-> This project is designed to operate entirely within the AWS Free Tier at zero cost.
-
-| Service | Free Tier Allowance | This Project's Usage | Guard |
-|---------|--------------------|-----------------------|-------|
-| Amazon ECR | 500 MB storage/month | ~50 MB per image | Lifecycle policy: max 5 images |
-| Amazon S3 | 5 GB storage, 2,000 PUT/month | Small Markdown files | 30-day lifecycle expiry |
-| AWS IAM | Always free | 1 role, 1 OIDC provider | — |
-| GitHub Actions | 2,000 min/month (public: unlimited) | ~8 min/run | Public repo |
-
-**Estimated monthly cost: $0.00**
-
-To destroy all AWS resources:
-```bash
-cd terraform && terraform destroy
-```
-
----
-
 ## Screenshots
 
 > Documentation screenshots from a live pipeline run. All stages executed on commit `5712fe2`.
@@ -286,7 +265,8 @@ cd terraform && terraform destroy
 ### 01 · Terraform Init
 > AWS provider downloaded, backend initialised, working directory prepared.
 
-![Terraform Init](docs/screenshots/01-terraform-init.png)
+<img width="700" height="400" alt="terraform-init" src="https://github.com/user-attachments/assets/00817fa6-e6c6-45d7-973c-8ef3ef14a95a" />
+
 
 ```
 Terraform has been successfully initialized!
@@ -298,7 +278,8 @@ Provider: hashicorp/aws ~> 5.0
 ### 02 · Terraform Plan
 > Preview of all AWS resources to be provisioned — 8 resources, zero existing state conflicts.
 
-![Terraform Plan](docs/screenshots/02-terraform-plan.png)
+<img width="700" height="400" alt="terraform plan" src="https://github.com/user-attachments/assets/afa8cb4d-7a04-4bf7-86db-8a582411b4de" />
+
 
 ```
 Plan: 8 to add, 0 to change, 0 to destroy.
@@ -306,47 +287,35 @@ Plan: 8 to add, 0 to change, 0 to destroy.
 
 ---
 
-### 03 · Terraform Apply — Outputs
-> Infrastructure provisioned. ECR repository URL, IAM role ARN, and S3 bucket name emitted as outputs.
-
-![Terraform Apply](docs/screenshots/03-terraform-apply-outputs.png)
-
-```
-Apply complete! Resources: 8 added, 0 changed, 0 destroyed.
-
-Outputs:
-  ecr_repository_url = "XXXXXXXXXXXX.dkr.ecr.us-east-1.amazonaws.com/dotweb-app"
-  iam_role_arn       = "arn:aws:iam::XXXXXXXXXXXX:role/dotweb-devsecops-github-actions-role"
-  s3_reports_bucket  = "dotweb-devsecops-pipeline-reports-XXXXXXXXXXXX"
-```
 
 ---
 
-### 04 · GitHub Secrets Configuration
+### 03 · GitHub Secrets Configuration
 > Three repository secrets configured — AWS_ROLE_ARN, S3_REPORTS_BUCKET, AWS_REGION.
+<img width="700" height="400" alt="github-secrets" src="https://github.com/user-attachments/assets/ac9c71f4-abde-477f-9174-ce0f08bf1740" />
 
-![GitHub Secrets](docs/screenshots/04-github-secrets.png)
 
 ---
 
-### 05 · Pipeline Overview — All 9 Stages Running
+### 04 · Pipeline Overview — All 9 Stages Running
 > GitHub Actions workflow DAG showing all 9 stages triggered on push to main.
 
-![Pipeline Overview](docs/screenshots/05-pipeline-running.png)
+<img width="700" height="400" alt="github-actions-running" src="https://github.com/user-attachments/assets/0dfb7552-be2a-41e7-ad7b-f579647589e5" />
 
 ---
 
-### 06 · Pipeline Complete — All Stages Green
+### 05 · Pipeline Complete — All Stages Green
 > Full pipeline run completed successfully. All security gates passed. Total runtime ~8 minutes.
 
-![Pipeline All Green](docs/screenshots/06-pipeline-all-green.png)
+<img width="700" height="400" alt="pipeline-all-green" src="https://github.com/user-attachments/assets/cb40d5ee-ecf2-407b-acff-17832c852625" />
 
 ---
 
-### 07 · Stage 2 — Bandit SAST Scan Output
+### 06 · Stage 2 — Bandit SAST Scan Output
 > Bandit scanned the Python application source. Results uploaded to GitHub Security tab as SARIF.
 
-![Bandit SAST](docs/screenshots/07-sast-bandit-logs.png)
+<img width="700" height="400" alt="sast-bandit-logs" src="https://github.com/user-attachments/assets/9e68fe63-82e8-492b-85cd-fde4d1600bb2" />
+
 
 ```
 Test results:
@@ -358,10 +327,11 @@ Code scanned:
 
 ---
 
-### 08 · Stage 6 — Trivy Container Scan
+### 07 · Stage 6 — Trivy Container Scan
 > Trivy scanned the Docker image for CVEs in OS packages and Python dependencies.
 
-![Trivy Scan](docs/screenshots/08-trivy-container-scan.png)
+<img width="700" height="400" alt="trivy-container-scan" src="https://github.com/user-attachments/assets/10e99909-8b6d-4b03-be8d-461f8fc63b0a" />
+
 
 ```
 dotweb-app (debian 12.x)
@@ -370,24 +340,26 @@ Total: 0 (CRITICAL: 0, HIGH: 0)
 
 ---
 
-### 09 · GitHub Security Tab — SARIF Findings
+### 08 · GitHub Security Tab — SARIF Findings
 > Code scanning results from Bandit, Semgrep, Trivy, and tfsec aggregated in GitHub's Security tab.
 
-![GitHub Security Tab](docs/screenshots/09-github-security-tab.png)
+<img width="700" height="400" alt="github-security-tab" src="https://github.com/user-attachments/assets/d747e9d2-fa28-442d-bad4-2520160df257" />
+
 
 ---
 
-### 10 · AWS ECR — Repository with Scanned Image
+### 9 · AWS ECR — Repository with Scanned Image
 > Docker image pushed to ECR with immutable SHA tag. ECR native scan status shows complete.
 
-![AWS ECR](docs/screenshots/10-aws-ecr-repo.png)
+<img width="700" height="400" alt="aws-ecr-repo" src="https://github.com/user-attachments/assets/e262ce36-60b2-46f1-8f1b-8ea5ad42087d" />
+
 
 ---
 
-### 11 · AWS S3 — Security Reports Bucket
+### 10 · AWS S3 — Security Reports Bucket
 > Consolidated security report uploaded to encrypted S3 bucket after pipeline run 6.
 
-![AWS S3 Reports](docs/screenshots/11-aws-s3-reports.png)
+<img width="700" height="400" alt="Report" src="https://github.com/user-attachments/assets/e600e499-6cf7-45c5-bc9b-8ee96dab3f59" />
 
 ```
 reports/6-5712fe2fd4be2f27abb4d1a96aaa32fbfe66c2df.md
@@ -395,30 +367,21 @@ reports/6-5712fe2fd4be2f27abb4d1a96aaa32fbfe66c2df.md
 
 ---
 
-### 12 · AWS IAM — GitHub OIDC Provider
+### 11 · AWS IAM — GitHub OIDC Provider
 > GitHub Actions OIDC provider registered in AWS IAM. No access keys stored anywhere.
 
-![AWS IAM OIDC](docs/screenshots/12-aws-iam-oidc.png)
+<img width="700" height="400" alt="aws-iam-oidc" src="https://github.com/user-attachments/assets/30047bad-1b64-422e-8b4f-8fe1e4128e8e" />
+
 
 ```
 Provider URL: token.actions.githubusercontent.com
 Audience:     sts.amazonaws.com
 ```
 
----
-
-### 13 · Terraform Destroy — Clean Teardown
-> All AWS resources destroyed cleanly. Zero residual infrastructure. Free Tier confirmed.
-
-![Terraform Destroy](docs/screenshots/13-terraform-destroy.png)
-
-```
-Destroy complete! Resources: 8 destroyed.
-```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 dotweb-devsecops-pipeline/
@@ -448,7 +411,7 @@ dotweb-devsecops-pipeline/
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -581,7 +544,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 -----
-# **👤** Author
+# Author
 **Adeoye Emmanuel** - AWS Certified Solutions Architect | AWS Security Solutions Architect | DevSecOps Engineer
 
 **Email:** Emmanuelofgrace@gmail.com

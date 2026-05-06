@@ -452,7 +452,6 @@ jobs:
         run: |
           aws s3 cp security-report.md "s3://${BUCKET}/reports/${RUN_NUM}-${SHA}.md"
           echo "Security report saved to S3"
-
       - name: Upload report as GitHub artifact
         uses: actions/upload-artifact@v4
         with:

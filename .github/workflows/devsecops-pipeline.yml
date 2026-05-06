@@ -445,11 +445,12 @@ jobs:
 
       - name: Upload report to S3
         if: github.ref == 'refs/heads/main'
+        env:
+          BUCKET: ${{ secrets.S3_REPORTS_BUCKET }}
+          RUN_NUM: ${{ github.run_number }}
+          SHA: ${{ github.sha }}
         run: |
-          RUN="${{ github.run_number }}"
-          SHA="${{ github.sha }}"
-          BUCKET="${{ secrets.S3_REPORTS_BUCKET }}"
-          aws s3 cp security-report.md s3://${BUCKET}/reports/${RUN}-${SHA}.md
+          aws s3 cp security-report.md "s3://${BUCKET}/reports/${RUN_NUM}-${SHA}.md"
           echo "Security report saved to S3"
 
       - name: Upload report as GitHub artifact

@@ -27,23 +27,19 @@
 ----
 ## Table of Contents
 
-- [About This Project](#about-this-project)
-- [Architecture](#architecture)
-- [Architecture Decisions and Rationale](#architecture-decisions-and-rationale)
-- [Security Controls Implemented](#security-controls-implemented)
-- [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Module Documentation](#module-documentation)
-- [Compliance Alignment](#compliance-alignment)
-- [Deployed Infrastructure — Live Resource IDs](#deployed-infrastructure--live-resource-ids)
-- [Terminal Evidence — CLI](#-terminal-evidence--cli)
-- [AWS Console Evidence](#-aws-console-evidence)
-- [Destroy Infrastructure](#destroy-infrastructure)
-- [Enabling GuardDuty and Security Hub](#enabling-guardduty-and-security-hub)
-- [Contributing](#contributing)
-- [Author](#author)
-- [License](#license)
+- [Overview](#Overview)
+- [Architecture](#Architecture)
+- [Pipeline Stages](#Pipeline-Stages)
+- [Security Tools](#Security-Tools)
+- [AWS Infrastructure](#AWS-Infrastructure)
+- [Screenshots](#Screenshots)
+- [Project Structure](#Project-Structure)
+- [Quick Start](#Quick-Start)
+- [Configuration Reference](#Configuration-Reference)
+- [Security Design Decisions](#Security-Design-Decisions)
+- [Pipeline Metrics](#Pipeline-Metrics)
+- [License](#License)
+- [Author](#Author)
 
 ---
 

@@ -1,8 +1,7 @@
 ###############################################################
 # DOTWEB Enterprise & Business Applications
 # DevSecOps CI/CD Security Pipeline - 9 Stages
-# All Semgrep findings fixed, pip-audit flag fixed,
-# tfsec SARIF fixed, Stage 9 AWS credentials fixed
+# Region hardcoded - no longer read from secrets
 ###############################################################
 
 name: DevSecOps Security Pipeline
@@ -27,7 +26,7 @@ env:
 jobs:
 
   # ============================================================
-  # STAGE 1 - SECRETS SCANNING (TruffleHog)
+  # STAGE 1 - SECRETS SCANNING
   # ============================================================
   secrets-scan:
     name: "Stage 1 · Secrets Scanning"
@@ -53,12 +52,10 @@ jobs:
           if-no-files-found: ignore
 
   # ============================================================
-  # STAGE 2 - SAST: Bandit only
-  # FIX: Removed semgrep-action (deprecated + blocking findings)
-  # Semgrep findings have been fixed in source files directly
+  # STAGE 2 - SAST: Bandit + Semgrep
   # ============================================================
   sast-scan:
-    name: "Stage 2 · SAST (Bandit)"
+    name: "Stage 2 · SAST (Bandit + Semgrep)"
     runs-on: ubuntu-latest
     needs: secrets-scan
     steps:
@@ -70,8 +67,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Bandit
-        run: pip install bandit[sarif]
+      - name: Install security tools
+        run: pip install bandit[sarif] semgrep
 
       - name: Run Bandit SAST scan
         run: |
@@ -81,7 +78,7 @@ jobs:
             --severity-level medium \
             --exit-zero
           bandit -r app/ -f txt | tee bandit-results.txt
-          echo "Bandit SAST scan complete"
+          echo "Bandit scan complete"
 
       - name: Upload Bandit SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -92,13 +89,11 @@ jobs:
 
       - name: Run Semgrep SAST scan
         run: |
-          pip install semgrep
           semgrep scan \
             --config=p/python \
             --config=p/owasp-top-ten \
             --sarif \
             --output=semgrep-results.sarif \
-            --error \
             app/ || true
           echo "Semgrep scan complete"
 
@@ -122,8 +117,6 @@ jobs:
 
   # ============================================================
   # STAGE 3 - SCA: pip-audit
-  # FIX: Removed --exit-zero flag (not supported in this version)
-  # FIX: Removed --format=cyclonedx-json (not supported)
   # ============================================================
   sca-scan:
     name: "Stage 3 · SCA (pip-audit)"
@@ -172,8 +165,6 @@ jobs:
 
   # ============================================================
   # STAGE 4 - IaC SECURITY: tfsec
-  # FIX: Generate SARIF manually so file always exists
-  # FIX: Updated to codeql-action v4
   # ============================================================
   iac-scan:
     name: "Stage 4 · IaC Security (tfsec)"
@@ -198,13 +189,6 @@ jobs:
             echo '{"version":"2.1.0","runs":[]}' > tfsec-results.sarif
           fi
           echo "tfsec scan complete"
-          cat tfsec-results.sarif | python3 -c "
-          import json,sys
-          d=json.load(sys.stdin)
-          runs=d.get('runs',[])
-          total=sum(len(r.get('results',[])) for r in runs)
-          print(f'tfsec findings: {total}')
-          " || true
 
       - name: Upload tfsec SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
@@ -244,7 +228,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Save Docker image for next stages
+      - name: Save Docker image
         run: docker save dotweb-app:${{ github.sha }} -o /tmp/docker-image.tar
 
       - name: Upload Docker image artifact
@@ -306,6 +290,7 @@ jobs:
 
   # ============================================================
   # STAGE 7 - PUSH TO ECR
+  # Region hardcoded — not read from secrets
   # ============================================================
   push-to-ecr:
     name: "Stage 7 · Push to ECR"
@@ -322,11 +307,17 @@ jobs:
       - name: Load Docker image
         run: docker load -i /tmp/docker-image.tar
 
+      - name: Debug — print role ARN length
+        run: |
+          ARN="${{ secrets.AWS_ROLE_ARN }}"
+          echo "ARN length: ${#ARN}"
+          echo "ARN starts with: ${ARN:0:20}"
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -356,23 +347,23 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-east-1
 
-      - name: Wait for ECR scan to complete
+      - name: Wait for ECR scan
         run: |
           echo "Waiting 30s for ECR scan..."
           sleep 30
           aws ecr wait image-scan-complete \
             --repository-name ${{ env.ECR_REPO }} \
             --image-id imageTag=${{ github.sha }} \
-            --region ${{ env.AWS_REGION }} || true
+            --region us-east-1 || true
 
       - name: Print ECR scan findings
         run: |
           aws ecr describe-image-scan-findings \
             --repository-name ${{ env.ECR_REPO }} \
             --image-id imageTag=${{ github.sha }} \
-            --region ${{ env.AWS_REGION }} \
+            --region us-east-1 \
             --output json | python3 -c "
           import json, sys
           data = json.load(sys.stdin)
@@ -385,9 +376,7 @@ jobs:
 
   # ============================================================
   # STAGE 9 - SECURITY REPORT
-  # FIX: All github context variables moved to env block
-  # FIX: AWS credentials step placed correctly before S3 upload
-  # FIX: uses secrets.AWS_REGION directly
+  # Region hardcoded — not read from secrets
   # ============================================================
   security-report:
     name: "Stage 9 · Security Report"
@@ -444,7 +433,7 @@ jobs:
           ---
           Generated by DOTWEB DevSecOps Pipeline - DOTWEB Enterprise and Business Applications
           REPORT
-          echo "Report generated:"
+          echo "Report generated"
           cat security-report.md
 
       - name: Configure AWS credentials for S3 upload
@@ -452,7 +441,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region: us-east-1
 
       - name: Upload report to S3
         if: github.ref == 'refs/heads/main'

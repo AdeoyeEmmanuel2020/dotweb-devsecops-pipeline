@@ -38,9 +38,8 @@
 - [Configuration Reference](#Configuration-Reference)
 - [Security Design Decisions](#Security-Design-Decisions)
 - [Pipeline Metrics](#Pipeline-Metrics)
-- [License](#License)
 - [Author](#Author)
-
+- [License](#License)
 ---
 
 ##  Overview

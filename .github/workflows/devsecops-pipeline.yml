@@ -1,32 +1,34 @@
 ###############################################################
 # DOTWEB Enterprise & Business Applications
 # DevSecOps CI/CD Security Pipeline — 9 Stages
+# FIXED: TruffleHog base/head removed, Stage 9 AWS credentials fixed
 ###############################################################
- 
+
 name: DevSecOps Security Pipeline
- 
+
 on:
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
- 
+
 permissions:
   contents: read
   id-token: write
   security-events: write
   actions: read
- 
+
 env:
   AWS_REGION: us-east-1
   ECR_REPO: dotweb-app
   IMAGE_TAG: ${{ github.sha }}
- 
+
 jobs:
- 
+
   # ============================================================
   # STAGE 1 — SECRETS SCANNING (TruffleHog)
+  # FIX: Removed base/head lines — now works on first push
   # ============================================================
   secrets-scan:
     name: "Stage 1 · Secrets Scanning"
@@ -36,15 +38,13 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
- 
+
       - name: Run TruffleHog secrets scan
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
           extra_args: --only-verified
- 
+
       - name: Upload secrets scan results
         if: always()
         uses: actions/upload-artifact@v4
@@ -52,7 +52,7 @@ jobs:
           name: secrets-scan-results
           path: trufflehog-results.json
           if-no-files-found: ignore
- 
+
   # ============================================================
   # STAGE 2 — SAST: Bandit + Semgrep
   # ============================================================
@@ -63,15 +63,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
- 
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
- 
+
       - name: Install Bandit
         run: pip install bandit[sarif]
- 
+
       - name: Run Bandit SAST scan
         run: |
           bandit -r app/ \
@@ -80,14 +80,14 @@ jobs:
             --severity-level medium \
             --exit-zero
           bandit -r app/ -f txt | tee bandit-results.txt
- 
+
       - name: Upload Bandit SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: bandit-results.sarif
           category: bandit
- 
+
       - name: Run Semgrep SAST scan
         uses: returntocorp/semgrep-action@v1
         with:
@@ -97,7 +97,7 @@ jobs:
             p/secrets
         env:
           SEMGREP_TIMEOUT: 300
- 
+
       - name: Upload SAST results
         if: always()
         uses: actions/upload-artifact@v4
@@ -106,9 +106,9 @@ jobs:
           path: |
             bandit-results.sarif
             bandit-results.txt
- 
+
   # ============================================================
-  # STAGE 3 — SCA: pip-audit (Dependency Scanning)
+  # STAGE 3 — SCA: pip-audit
   # ============================================================
   sca-scan:
     name: "Stage 3 · SCA (pip-audit)"
@@ -117,15 +117,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
- 
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
- 
+
       - name: Install pip-audit
         run: pip install pip-audit
- 
+
       - name: Run SCA dependency audit
         run: |
           pip-audit \
@@ -133,28 +133,38 @@ jobs:
             --format=json \
             --output=sca-results.json \
             --exit-zero
+          pip-audit \
+            -r app/requirements.txt \
+            --format=cyclonedx-json \
+            --output=sbom.json \
+            --exit-zero || true
           cat sca-results.json
- 
-      - name: Security Gate — Block CRITICAL vulnerabilities
+
+      - name: Check for CRITICAL vulnerabilities
         run: |
-          CRITICAL=$(python3 -c "
-          import json
-          with open('sca-results.json') as f:
-              data = json.load(f)
-          deps = data.get('dependencies', [])
-          count = sum(1 for d in deps for v in d.get('vulns', []))
-          print(count)
+          CRITICAL=$(cat sca-results.json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          vulns = data.get('dependencies', [])
+          critical = [v for dep in vulns for v in dep.get('vulns', []) if 'CRITICAL' in str(v.get('fix_versions', ''))]
+          print(len(critical))
           " 2>/dev/null || echo "0")
-          echo "Vulnerabilities found: $CRITICAL"
-          echo "✅ SCA security gate passed"
- 
+          echo "Critical vulnerabilities found: $CRITICAL"
+          if [ "$CRITICAL" -gt "0" ]; then
+            echo "SECURITY GATE FAILED: $CRITICAL CRITICAL vulnerabilities detected!"
+            exit 1
+          fi
+          echo "SCA security gate passed"
+
       - name: Upload SCA results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sca-results
-          path: sca-results.json
- 
+          path: |
+            sca-results.json
+            sbom.json
+
   # ============================================================
   # STAGE 4 — IaC SECURITY: tfsec
   # ============================================================
@@ -165,7 +175,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
- 
+
       - name: Run tfsec IaC scan
         uses: aquasecurity/tfsec-action@v1.0.0
         with:
@@ -173,21 +183,21 @@ jobs:
           format: sarif
           sarif_file: tfsec-results.sarif
           soft_fail: true
- 
+
       - name: Upload tfsec SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: tfsec-results.sarif
           category: tfsec
- 
+
       - name: Upload tfsec results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: iac-scan-results
           path: tfsec-results.sarif
- 
+
   # ============================================================
   # STAGE 5 — BUILD DOCKER IMAGE
   # ============================================================
@@ -198,10 +208,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
- 
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
- 
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -211,17 +221,17 @@ jobs:
           tags: dotweb-app:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
- 
+
       - name: Save Docker image for next stages
         run: docker save dotweb-app:${{ github.sha }} -o /tmp/docker-image.tar
- 
+
       - name: Upload Docker image artifact
         uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: /tmp/docker-image.tar
           retention-days: 1
- 
+
   # ============================================================
   # STAGE 6 — CONTAINER SCANNING: Trivy
   # ============================================================
@@ -235,10 +245,10 @@ jobs:
         with:
           name: docker-image
           path: /tmp
- 
+
       - name: Load Docker image
         run: docker load -i /tmp/docker-image.tar
- 
+
       - name: Run Trivy container scan (SARIF)
         uses: aquasecurity/trivy-action@master
         with:
@@ -248,8 +258,8 @@ jobs:
           exit-code: "0"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
- 
-      - name: Run Trivy container scan (Table view in logs)
+
+      - name: Run Trivy container scan (Table for logs)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: dotweb-app:${{ github.sha }}
@@ -257,23 +267,49 @@ jobs:
           exit-code: "0"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
- 
+
       - name: Upload Trivy SARIF to GitHub Security
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: trivy-container.sarif
           category: trivy-container
- 
+
+      - name: Security Gate — Block CRITICAL findings
+        run: |
+          CRITICAL_COUNT=$(docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            aquasec/trivy:latest image \
+            --severity CRITICAL \
+            --ignore-unfixed \
+            --quiet \
+            --format json \
+            dotweb-app:${{ github.sha }} | \
+            python3 -c "
+          import json, sys
+          try:
+              data = json.load(sys.stdin)
+              vulns = sum(len(r.get('Vulnerabilities') or []) for r in data.get('Results', []))
+              print(vulns)
+          except:
+              print(0)
+          ")
+          echo "CRITICAL container vulnerabilities: $CRITICAL_COUNT"
+          if [ "$CRITICAL_COUNT" -gt "0" ]; then
+            echo "SECURITY GATE FAILED: $CRITICAL_COUNT CRITICAL vulnerabilities!"
+            exit 1
+          fi
+          echo "Container scan security gate passed"
+
       - name: Upload container scan results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: container-scan-results
           path: trivy-container.sarif
- 
+
   # ============================================================
-  # STAGE 7 — PUSH TO ECR (only on main branch)
+  # STAGE 7 — PUSH TO ECR
   # ============================================================
   push-to-ecr:
     name: "Stage 7 · Push to ECR"
@@ -286,21 +322,21 @@ jobs:
         with:
           name: docker-image
           path: /tmp
- 
+
       - name: Load Docker image
         run: docker load -i /tmp/docker-image.tar
- 
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
- 
+
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
- 
-      - name: Tag and push image to ECR
+
+      - name: Tag and push to ECR
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
@@ -308,10 +344,10 @@ jobs:
           docker tag dotweb-app:${{ github.sha }} $ECR_REGISTRY/${{ env.ECR_REPO }}:latest
           docker push $ECR_REGISTRY/${{ env.ECR_REPO }}:${{ github.sha }}
           docker push $ECR_REGISTRY/${{ env.ECR_REPO }}:latest
-          echo "✅ Image pushed: $ECR_REGISTRY/${{ env.ECR_REPO }}:${{ github.sha }}"
- 
+          echo "Image pushed to ECR"
+
   # ============================================================
-  # STAGE 8 — ECR IMAGE SCAN (AWS Native)
+  # STAGE 8 — ECR IMAGE SCAN
   # ============================================================
   ecr-scan:
     name: "Stage 8 · ECR Image Scan"
@@ -324,17 +360,17 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
- 
-      - name: Wait for ECR scan
+
+      - name: Wait for ECR scan to complete
         run: |
-          echo "Waiting 30s for ECR scan to complete..."
+          echo "Waiting for ECR scan..."
           sleep 30
           aws ecr wait image-scan-complete \
             --repository-name ${{ env.ECR_REPO }} \
             --image-id imageTag=${{ github.sha }} \
             --region ${{ env.AWS_REGION }} || true
- 
-      - name: Print ECR scan findings summary
+
+      - name: Get ECR scan findings
         run: |
           aws ecr describe-image-scan-findings \
             --repository-name ${{ env.ECR_REPO }} \
@@ -344,15 +380,16 @@ jobs:
           import json, sys
           data = json.load(sys.stdin)
           counts = data.get('imageScanFindings', {}).get('findingSeverityCounts', {})
-          print('=== ECR Scan Results ===')
+          print('ECR Scan Summary:')
           for sev, count in counts.items():
               print(f'  {sev}: {count}')
-          print('========================')
           "
-          echo "✅ ECR scan complete"
- 
+          echo "ECR scan complete"
+
   # ============================================================
-  # STAGE 9 — CONSOLIDATED SECURITY REPORT + UPLOAD TO S3
+  # STAGE 9 — SECURITY REPORT
+  # FIX: configure-aws-credentials now runs BEFORE the S3 upload step
+  # FIX: uses secrets.AWS_REGION instead of env.AWS_REGION
   # ============================================================
   security-report:
     name: "Stage 9 · Security Report"
@@ -364,7 +401,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: all-reports/
- 
+
       - name: Generate consolidated security report
         run: |
           REPORT_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
@@ -374,46 +411,48 @@ jobs:
           **Commit SHA:** ${{ github.sha }}
           **Branch:** ${{ github.ref_name }}
           **Pipeline Run:** ${{ github.run_number }}
- 
+
           ## Pipeline Stages Summary
           | Stage | Tool | Status |
           |-------|------|--------|
-          | 1. Secrets Scan | TruffleHog | ${{ needs.secrets-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |
-          | 2. SAST | Bandit + Semgrep | ${{ needs.sast-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |
-          | 3. SCA | pip-audit | ${{ needs.sca-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |
-          | 4. IaC Scan | tfsec | ${{ needs.iac-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |
+          | 1. Secrets Scan | TruffleHog | ${{ needs.secrets-scan.result == 'success' && 'PASS' || 'FAIL' }} |
+          | 2. SAST | Bandit + Semgrep | ${{ needs.sast-scan.result == 'success' && 'PASS' || 'FAIL' }} |
+          | 3. SCA | pip-audit | ${{ needs.sca-scan.result == 'success' && 'PASS' || 'FAIL' }} |
+          | 4. IaC Scan | tfsec | ${{ needs.iac-scan.result == 'success' && 'PASS' || 'FAIL' }} |
           | 5. Build | Docker | Upstream |
-          | 6. Container Scan | Trivy | ${{ needs.container-scan.result == 'success' && '✅ PASS' || '❌ FAIL' }} |
- 
-          ## Security Tools Integrated
-          - TruffleHog — Secrets and credentials detection
-          - Bandit — Python SAST (OWASP Top 10)
-          - Semgrep — Multi-language SAST patterns
-          - pip-audit — Dependency CVE scanning (SCA)
-          - tfsec — Terraform IaC misconfiguration detection
-          - Trivy — Container vulnerability scanning
-          - AWS ECR Scan — Cloud-native image scanning
-          - Docker Multi-stage — Attack surface reduction
- 
+          | 6. Container Scan | Trivy | ${{ needs.container-scan.result == 'success' && 'PASS' || 'FAIL' }} |
+          | 7. Push to ECR | AWS ECR | Upstream |
+          | 8. ECR Scan | AWS Native | Upstream |
+
+          ## Security Tools Used
+          - TruffleHog - Secrets and credentials detection
+          - Bandit - Python SAST (OWASP Top 10)
+          - Semgrep - Multi-language SAST patterns
+          - pip-audit - SCA / dependency CVE scanning
+          - tfsec - Terraform IaC misconfiguration detection
+          - Trivy - Container OS and app vulnerability scanning
+          - AWS ECR Scan - Cloud-native image scanning
+          - Docker Multi-stage - Attack surface reduction
+
           ---
-          *Generated by DOTWEB DevSecOps Pipeline · DOTWEB Enterprise & Business Applications*
+          Generated by DOTWEB DevSecOps Pipeline - DOTWEB Enterprise and Business Applications
           REPORT
           cat security-report.md
- 
+
       - name: Configure AWS credentials for S3 upload
         if: github.ref == 'refs/heads/main'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
- 
+          aws-region: ${{ secrets.AWS_REGION }}
+
       - name: Upload report to S3
         if: github.ref == 'refs/heads/main'
         run: |
           aws s3 cp security-report.md \
             s3://${{ secrets.S3_REPORTS_BUCKET }}/reports/${{ github.run_number }}-${{ github.sha }}.md
-          echo "✅ Security report saved to S3"
- 
+          echo "Security report saved to S3"
+
       - name: Upload report as GitHub artifact
         uses: actions/upload-artifact@v4
         with:

@@ -17,8 +17,8 @@
 
 <br/>
 
-> **An enterprise-grade DevSecOps CI/CD pipeline integrating 8+ automated security tools  
-> with zero-trust AWS infrastructure, keyless OIDC authentication, and full audit trail.**
+ **An enterprise-grade DevSecOps CI/CD pipeline integrating 8+ automated security tools  
+ with zero-trust AWS infrastructure, keyless OIDC authentication, and full audit trail.**
 
 <br/>
 </div>
